@@ -620,7 +620,7 @@ function sendOTP(phoneOrEmail) {
             buttons.forEach(btn => btn.innerText = "Send OTP");
         }).catch((error) => {
             console.error("SMS not sent", error);
-            alert("Error sending SMS. Please check the number and try again.");
+            alert("Firebase Error: " + error.message);
             buttons.forEach(btn => btn.innerText = "Send OTP");
             if(window.recaptchaVerifier) {
                 window.recaptchaVerifier.render().then(function(widgetId) {
