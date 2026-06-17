@@ -1,4 +1,5 @@
 const cartModel = require('../models/cartModel');
+const rideModel = require('../models/rideModel');
 
 module.exports = (io) => {
     io.on('connection', async (socket) => {
@@ -16,7 +17,9 @@ module.exports = (io) => {
             if (cart) {
                 await cartModel.updateCart(cartId, { 
                     driverSocketId: socket.id, 
-                    isOnline: true 
+                    isOnline: true,
+                    driverPhone: data.driverPhone || null,
+                    driverName: data.driverName || 'Driver'
                 });
                 
                 // Join a room specific to this driver/cart for direct messages
@@ -61,10 +64,12 @@ module.exports = (io) => {
             const cart = await cartModel.getCart(cartId);
             
             if (cart && cart.seats[seatNumber] && cart.seats[seatNumber].status === 'available') {
-                // Update specific seat in Firestore
-                const seats = { ...cart.seats };
-                seats[seatNumber].status = 'pending';
-                await cartModel.updateCart(cartId, { seats });
+                await cartModel.updateCart(cartId, {
+                    [`seats.${seatNumber}.status`]: 'pending',
+                    [`seats.${seatNumber}.studentPhone`]: studentInfo.phone || null,
+                    [`seats.${seatNumber}.studentName`]: studentInfo.name || 'Student',
+                    [`seats.${seatNumber}.route`]: route || null
+                });
                 
                 io.emit('seat-updated', { cartId, seatNumber, status: 'pending' });
 
@@ -78,8 +83,7 @@ module.exports = (io) => {
                     });
                 } else {
                     // If driver is offline, auto-reject
-                    seats[seatNumber].status = 'available';
-                    await cartModel.updateCart(cartId, { seats });
+                    await cartModel.updateCart(cartId, { [`seats.${seatNumber}.status`]: 'available' });
                     io.emit('seat-updated', { cartId, seatNumber, status: 'available' });
                     socket.emit('request-rejected', { message: 'Driver is currently offline.' });
                 }
@@ -94,15 +98,25 @@ module.exports = (io) => {
             const cart = await cartModel.getCart(cartId);
             
             if (cart && cart.seats[seatNumber]) {
-                const seats = { ...cart.seats };
-                seats[seatNumber].status = 'occupied';
-                seats[seatNumber].requestId = requestId;
-                
-                // Generate a 4-digit OTP for this ride
                 const rideOtp = Math.floor(1000 + Math.random() * 9000).toString();
-                seats[seatNumber].rideOtp = rideOtp;
                 
-                await cartModel.updateCart(cartId, { seats });
+                const rideId = await rideModel.createRide({
+                    cartId,
+                    seatNumber,
+                    driverPhone: cart.driverPhone || null,
+                    driverName: cart.driverName || 'Driver',
+                    studentPhone: cart.seats[seatNumber].studentPhone || null,
+                    studentName: cart.seats[seatNumber].studentName || 'Student',
+                    route: cart.seats[seatNumber].route || null,
+                    price: 10
+                });
+
+                await cartModel.updateCart(cartId, {
+                    [`seats.${seatNumber}.status`]: 'occupied',
+                    [`seats.${seatNumber}.requestId`]: requestId,
+                    [`seats.${seatNumber}.rideOtp`]: rideOtp,
+                    [`seats.${seatNumber}.rideId`]: rideId
+                });
 
                 // Notify all clients that the seat is now occupied
                 io.emit('seat-updated', { cartId, seatNumber, status: 'occupied' });
@@ -133,9 +147,7 @@ module.exports = (io) => {
             const cart = await cartModel.getCart(cartId);
             
             if (cart) {
-                const seats = { ...cart.seats };
-                seats[seatNumber].status = 'available';
-                await cartModel.updateCart(cartId, { seats });
+                await cartModel.updateCart(cartId, { [`seats.${seatNumber}.status`]: 'available' });
                 
                 // Notify everyone of the seat state change
                 io.emit('seat-updated', { cartId, seatNumber, status: 'available' });
@@ -152,14 +164,22 @@ module.exports = (io) => {
             
             if (cart && cart.seats[seatNumber]) {
                 const requestId = cart.seats[seatNumber].requestId;
+                const rideId = cart.seats[seatNumber].rideId;
                 
-                const seats = { ...cart.seats };
-                seats[seatNumber].status = 'available';
-                seats[seatNumber].student = null;
-                seats[seatNumber].requestId = null;
-                seats[seatNumber].rideOtp = null;
+                await cartModel.updateCart(cartId, {
+                    [`seats.${seatNumber}.status`]: 'available',
+                    [`seats.${seatNumber}.student`]: null,
+                    [`seats.${seatNumber}.requestId`]: null,
+                    [`seats.${seatNumber}.rideOtp`]: null,
+                    [`seats.${seatNumber}.studentPhone`]: null,
+                    [`seats.${seatNumber}.studentName`]: null,
+                    [`seats.${seatNumber}.route`]: null,
+                    [`seats.${seatNumber}.rideId`]: null
+                });
                 
-                await cartModel.updateCart(cartId, { seats });
+                if (rideId) {
+                    await rideModel.completeRide(rideId);
+                }
                 
                 // Notify everyone
                 io.emit('seat-updated', { cartId, seatNumber, status: 'available' });
@@ -179,10 +199,27 @@ module.exports = (io) => {
             
             for (const cartId in allCarts) {
                 if (allCarts[cartId].driverSocketId === socket.id) {
+                    const cart = allCarts[cartId];
+                    const seats = { ...cart.seats };
+                    let seatsChanged = false;
+
+                    // Reset any stuck pending seats
+                    for (const seatNum in seats) {
+                        if (seats[seatNum].status === 'pending') {
+                            seats[seatNum].status = 'available';
+                            seats[seatNum].studentPhone = null;
+                            seats[seatNum].studentName = null;
+                            seats[seatNum].route = null;
+                            seatsChanged = true;
+                        }
+                    }
+
                     await cartModel.updateCart(cartId, {
                         isOnline: false,
-                        driverSocketId: null
+                        driverSocketId: null,
+                        ...(seatsChanged && { seats }) // Only update seats if we changed them
                     });
+                    
                     console.log(`Driver for ${cartId} went offline unexpectedly`);
                     stateChanged = true;
                 }

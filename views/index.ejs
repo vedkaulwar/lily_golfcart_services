@@ -68,10 +68,7 @@
                 <div class="mt-10 mb-2 relative z-10">
                     <h1 class="text-[28px] font-bold text-gray-900 leading-tight">Welcome to <br><span class="text-primary text-[32px]">EV Campus Services</span></h1>
                 </div>
-                <div class="relative flex-grow flex items-center justify-center -mx-8 my-6">
-                    <img src="/assets/golf_cart.png" alt="EV Cart" class="w-full object-contain max-h-64 scale-110 drop-shadow-2xl z-10" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                    <div class="hidden w-48 h-48 bg-gray-100 rounded-full items-center justify-center text-5xl">🛺</div>
-                </div>
+
                 <div class="mt-auto space-y-4 relative z-10 pb-4">
                     <button onclick="switchAuthView('login-view', 'student')" class="w-full bg-primary hover:bg-primaryHover text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg transition flex justify-center items-center">
                         Login
@@ -85,7 +82,7 @@
                     </div>
                     <div class="mt-8 pt-8 border-t border-gray-200">
                         <button onclick="switchAuthView('login-view', 'driver')" class="w-full bg-gray-900 hover:bg-black text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition flex justify-center items-center text-sm">
-                            Drive with Lily (Partner)
+                            Drive with Lily (Driver)
                         </button>
                     </div>
                 </div>
@@ -106,12 +103,9 @@
                         <input type="text" id="signup-name" required placeholder="Enter your full name" class="w-full border border-gray-200 rounded-lg p-3 text-sm transition focus:ring-1">
                     </div>
                     <div>
-                        <label class="block text-[13px] font-semibold text-gray-800 mb-1.5">Mobile Number</label>
+                        <label class="block text-[13px] font-semibold text-gray-800 mb-1.5">Mobile Number or Email ID</label>
                         <div class="flex">
-                            <div class="flex-shrink-0 flex items-center border border-gray-200 border-r-0 rounded-l-lg px-3 bg-white">
-                                <span class="text-sm font-semibold">+91</span>
-                            </div>
-                            <input type="tel" id="signup-phone" required placeholder="Enter mobile number" pattern="[0-9]{10}" class="w-full border border-gray-200 rounded-r-lg p-3 text-sm transition">
+                            <input type="text" id="signup-phone" required placeholder="Enter mobile number or email" class="w-full border border-gray-200 rounded-lg p-3 text-sm transition">
                         </div>
                     </div>
                     <div id="driver-signup-fields" class="hidden">
@@ -141,12 +135,9 @@
                 </div>
                 <form id="login-form" class="space-y-5 flex-grow flex flex-col">
                     <div>
-                        <label class="block text-[13px] font-semibold text-gray-800 mb-1.5">Mobile Number</label>
+                        <label class="block text-[13px] font-semibold text-gray-800 mb-1.5">Mobile Number or Email ID</label>
                         <div class="flex">
-                            <div class="flex-shrink-0 flex items-center border border-gray-200 border-r-0 rounded-l-lg px-3 bg-white">
-                                <span class="text-sm font-semibold">+91</span>
-                            </div>
-                            <input type="tel" id="login-phone" required placeholder="Enter mobile number" pattern="[0-9]{10}" class="w-full border border-gray-200 rounded-r-lg p-3 text-sm transition">
+                            <input type="text" id="login-phone" required placeholder="Enter mobile number or email" class="w-full border border-gray-200 rounded-lg p-3 text-sm transition">
                         </div>
                     </div>
                     <button type="submit" class="w-full bg-primary hover:bg-primaryHover text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg transition mt-2 text-[15px]">
@@ -164,8 +155,8 @@
                     ← Back
                 </button>
                 <div class="text-center mb-8">
-                    <h2 class="text-2xl font-bold text-gray-900">Verify Mobile Number</h2>
-                    <p class="text-sm text-gray-500 mt-1">Enter the 6-digit OTP sent to<br><span id="otp-phone-display" class="font-bold text-primary">+91 XXXXX XXXXX</span></p>
+                    <h2 class="text-2xl font-bold text-gray-900">Verify Code</h2>
+                    <p class="text-sm text-gray-500 mt-1">Enter the 6-digit OTP sent to<br><span id="otp-phone-display" class="font-bold text-primary">XXXXX XXXXX</span></p>
                 </div>
                 <form id="otp-form" class="space-y-6 flex-grow flex flex-col">
                     <div class="flex justify-between space-x-2">
@@ -224,10 +215,9 @@
                         <h3 class="font-bold text-lg">Ride Confirmed! 🛺</h3>
                         <span class="bg-white text-emerald-600 text-xs font-bold px-2.5 py-1 rounded-full">Active</span>
                     </div>
-                    <p class="text-sm text-emerald-50 mb-3">Show this OTP to your driver.</p>
-                    <div class="bg-white/20 backdrop-blur-md rounded-xl p-3 text-center border border-white/30">
-                        <p class="text-[10px] text-emerald-50 uppercase tracking-widest font-bold mb-1">OTP</p>
-                        <p id="student-ride-otp" class="text-3xl font-bold tracking-widest text-white">----</p>
+                    <p class="text-sm text-emerald-50 mb-3 font-medium">Please complete payment to start the ride.</p>
+                    <div id="student-ride-otps-container" class="space-y-2 max-h-48 overflow-y-auto">
+                        <!-- Dynamic OTP blocks will be injected here -->
                     </div>
                 </div>
 

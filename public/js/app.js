@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -33,7 +33,7 @@ let appState = {
     pendingAuthPhone: null,
     watchId: null, 
     selectedCartId: null,
-    selectedSeat: null,
+    selectedSeats: [],
     route: { pickup: null, dropoff: null },
     cartData: {},
     walletBalance: 0.00,
@@ -191,8 +191,8 @@ window.switchAuthView = function(viewId, role = null) {
         
         if (role === 'driver') {
             if (driverFields) driverFields.classList.remove('hidden');
-            if (signupTitle) signupTitle.innerText = "Partner Sign Up";
-            if (loginTitle) loginTitle.innerText = "Partner Login";
+            if (signupTitle) signupTitle.innerText = "Driver Sign Up";
+            if (loginTitle) loginTitle.innerText = "Driver Login";
         } else {
             if (driverFields) driverFields.classList.add('hidden');
             if (signupTitle) signupTitle.innerText = "Create Account";
@@ -331,26 +331,44 @@ window.addFunds = async function(amount) {
     }
 };
 
-window.renderHistory = function() {
+window.renderHistory = async function() {
     const list = document.getElementById('ride-history-list');
-    if (appState.rideHistory.length === 0) {
-        list.innerHTML = `<p class="text-sm text-gray-500 text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">No past rides found.</p>`;
-    } else {
-        list.innerHTML = appState.rideHistory.map(ride => `
-            <div class="p-5 border border-gray-100 bg-gray-50 rounded-2xl flex justify-between items-center shadow-sm">
+    list.innerHTML = '<div class="text-center text-gray-500 py-8">Loading history...</div>';
+    
+    try {
+        const role = window.currentAuthRole || (appState.user && appState.user.role) || 'student';
+        const response = await fetch(`/api/rides/history/${appState.user.phone}?role=${role}`);
+        const history = await response.json();
+        
+        if (!history || history.length === 0) {
+            list.innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-history text-4xl mb-4 text-gray-300"></i>
+                    <p>No past rides found.</p>
+                </div>
+            `;
+            return;
+        }
+
+        list.innerHTML = history.map(ride => `
+            <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 flex justify-between items-center">
                 <div>
-                    <div class="flex items-center space-x-2 mb-2">
-                        <span class="bg-emerald-100 text-emerald-600 px-2 py-1 rounded text-[10px] uppercase tracking-wider font-bold">${ride.status}</span>
-                        <span class="text-gray-500 text-xs font-medium">${ride.time}</span>
+                    <div class="font-medium text-gray-800">${new Date(ride.createdAt).toLocaleDateString()} ${new Date(ride.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                    <div class="text-sm text-gray-500">${role === 'student' ? 'Driver: ' + (ride.driverName || 'Unknown') : 'Student: ' + (ride.studentName || 'Unknown')}</div>
+                    <div class="text-xs text-gray-400 mt-1">
+                        <span class="text-secondary font-medium">From:</span> ${ride.route && ride.route.pickup ? ride.route.pickup : 'Campus'}<br>
+                        <span class="text-primary font-medium">To:</span> ${ride.route && ride.route.dropoff ? ride.route.dropoff : 'Campus'}
                     </div>
-                    <p class="text-sm font-bold text-gray-800">${ride.route}</p>
                 </div>
                 <div class="text-right">
-                    <p class="font-bold text-gray-900">₹${ride.price}</p>
-                    <p class="text-[10px] text-gray-500 mt-1 uppercase font-bold tracking-wider">Driver: ${ride.driver}</p>
+                    <div class="text-secondary font-bold font-mono">₹${ride.price || 10}</div>
+                    <div class="text-xs ${ride.status === 'completed' ? 'text-green-500' : 'text-orange-500'} font-medium capitalize">${(ride.status || 'unknown').replace('_', ' ')}</div>
                 </div>
             </div>
         `).join('');
+    } catch (err) {
+        console.error("Error fetching history:", err);
+        list.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load history.</div>';
     }
 };
 
@@ -558,18 +576,46 @@ function setupRecaptcha() {
     });
 }
 
-function sendOTP(phone) {
-    const fullPhone = `+91${phone}`;
-    const appVerifier = window.recaptchaVerifier;
-    
+function sendOTP(phoneOrEmail) {
+    const isEmail = phoneOrEmail.includes('@');
     const buttons = document.querySelectorAll('button[type="submit"]');
     buttons.forEach(btn => btn.innerText = "Sending...");
 
+    if (isEmail) {
+        // Real OTP flow for Email addresses
+        fetch('/api/auth/send-email-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: phoneOrEmail })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                buttons.forEach(btn => btn.innerText = "Send OTP");
+                return;
+            }
+            appState.pendingAuthPhone = phoneOrEmail;
+            document.getElementById('otp-phone-display').innerText = phoneOrEmail;
+            switchAuthView('otp-view', window.currentAuthRole);
+            buttons.forEach(btn => btn.innerText = "Send OTP");
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error sending email.");
+            buttons.forEach(btn => btn.innerText = "Send OTP");
+        });
+        return;
+    }
+
+    const fullPhone = `+91${phoneOrEmail}`;
+    const appVerifier = window.recaptchaVerifier;
+    
     signInWithPhoneNumber(auth, fullPhone, appVerifier)
         .then((confirmationResult) => {
             window.confirmationResult = confirmationResult;
-            appState.pendingAuthPhone = phone;
-            document.getElementById('otp-phone-display').innerText = `+91 ${phone}`;
+            appState.pendingAuthPhone = phoneOrEmail;
+            document.getElementById('otp-phone-display').innerText = `+91 ${phoneOrEmail}`;
             switchAuthView('otp-view', window.currentAuthRole);
             buttons.forEach(btn => btn.innerText = "Send OTP");
         }).catch((error) => {
@@ -644,8 +690,11 @@ function handleVerifyOTP(e) {
     const verifyBtn = document.querySelector('#otp-form button[type="submit"]');
     verifyBtn.innerText = "Verifying...";
 
-    window.confirmationResult.confirm(code).then(async (result) => {
-        const phone = appState.pendingAuthPhone;
+    const phoneOrEmail = appState.pendingAuthPhone;
+    const isEmail = phoneOrEmail.includes('@');
+
+    const handleSuccess = async (result) => {
+        const phone = appState.pendingAuthPhone; // stores email or phone
         const userStr = localStorage.getItem(`user_${phone}`);
         let name = "User";
         let role = window.currentAuthRole;
@@ -686,13 +735,40 @@ function handleVerifyOTP(e) {
         
         verifyBtn.innerText = "Verify OTP";
         inputs.forEach(input => input.value = '');
-    }).catch((error) => {
+    };
+
+    const handleError = (error) => {
         console.error("OTP verification failed", error);
         alert("Invalid code. Please try again.");
         verifyBtn.innerText = "Verify OTP";
         inputs.forEach(input => input.value = '');
         inputs[0].focus();
-    });
+    };
+
+    if (isEmail) {
+        // Verify email OTP on the backend
+        fetch('/api/auth/verify-email-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: phoneOrEmail, code })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) throw new Error(data.error);
+            return signInWithCustomToken(auth, data.customToken);
+        })
+        .then(handleSuccess)
+        .catch(err => {
+            alert(err.message || "Invalid OTP");
+            handleError(err);
+        });
+    } else {
+        // Phone verification
+        window.confirmationResult.confirm(code)
+            .then(handleSuccess)
+            .catch(handleError);
+    }
+
 }
 
 window.logout = function() {
@@ -733,9 +809,9 @@ function transitionToMainApp() {
         const driverCartDisplay = document.getElementById('driver-cart-display');
         if (driverCartDisplay) driverCartDisplay.innerText = appState.user.cartId.replace(/_/g, ' ');
         
-        // Hide wallet and history for driver
         if (document.getElementById('link-wallet')) document.getElementById('link-wallet').classList.add('hidden');
-        if (document.getElementById('link-history')) document.getElementById('link-history').classList.add('hidden');
+        // Ensure drivers can see history
+        if (document.getElementById('link-history')) document.getElementById('link-history').classList.remove('hidden');
     }
     
     // Update markers now that we know the user role
@@ -831,7 +907,7 @@ function renderSeatGrid(cartId) {
         seatEl.className = 'seat';
         
         if (status === 'available') {
-            if (appState.selectedSeat === i) {
+            if (appState.selectedSeats.includes(i)) {
                 seatEl.classList.add('selected', 'bg-primary', 'text-white', 'border-primary', 'shadow-md', 'scale-105');
             } else {
                 seatEl.classList.add('available', 'bg-white', 'text-gray-700', 'border-gray-200', 'hover:border-primary', 'hover:text-primary');
@@ -848,32 +924,36 @@ window.toggleSeat = function(seatNumber) {
     const cart = appState.cartData[appState.selectedCartId];
     if (cart.seats[seatNumber].status !== 'available') return;
 
-    if (appState.selectedSeat === seatNumber) {
-        appState.selectedSeat = null; 
+    if (appState.selectedSeats.includes(seatNumber)) {
+        appState.selectedSeats = appState.selectedSeats.filter(s => s !== seatNumber); 
     } else {
-        appState.selectedSeat = seatNumber; 
+        appState.selectedSeats.push(seatNumber); 
     }
     
     const confirmBtn = document.getElementById('btn-confirm-booking');
-    if (appState.selectedSeat) {
+    if (appState.selectedSeats.length > 0) {
         confirmBtn.disabled = false;
         confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        confirmBtn.innerText = `Request ${appState.selectedSeats.length} Seat(s)`;
     } else {
         confirmBtn.disabled = true;
         confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        confirmBtn.innerText = "Request Booking";
     }
 
     renderSeatGrid(appState.selectedCartId);
 };
 
 function handleConfirmBooking() {
-    if (!appState.selectedSeat) return;
+    if (appState.selectedSeats.length === 0) return;
 
-    socket.emit('request-seat', {
-        cartId: appState.selectedCartId,
-        seatNumber: appState.selectedSeat,
-        studentInfo: { name: appState.user.name, phone: appState.user.phone },
-        route: appState.route
+    appState.selectedSeats.forEach(seatNumber => {
+        socket.emit('request-seat', {
+            cartId: appState.selectedCartId,
+            seatNumber: seatNumber,
+            studentInfo: { name: appState.user.name, phone: appState.user.phone },
+            route: appState.route
+        });
     });
 
     document.getElementById('btn-confirm-booking').innerText = "Requesting...";
@@ -890,7 +970,11 @@ function handleDutyToggle(e) {
         statusText.classList.remove('text-gray-400');
         statusText.classList.add('text-secondary');
         
-        socket.emit('driver-online', { cartId: appState.user.cartId });
+        socket.emit('driver-online', { 
+            cartId: appState.user.cartId,
+            driverPhone: appState.user.phone,
+            driverName: appState.user.name
+        });
         startLocationTracking();
     } else {
         statusText.innerText = "Offline";
@@ -968,7 +1052,7 @@ window.acceptRide = function(seatNumber, requestId, studentName) {
     // Replace Accept/Reject with OTP Input and Start button
     actionsDiv.innerHTML = `
         <div class="w-full">
-            <p class="text-xs text-gray-500 font-bold mb-1 uppercase tracking-wider">Verify Student OTP</p>
+            <p class="text-[10px] text-primary font-bold mb-1 uppercase tracking-wider text-center bg-blue-50 rounded p-1">1. Verify Payment &nbsp; 2. Enter Student OTP</p>
             <div class="flex space-x-2">
                 <input type="text" id="driver-otp-input-${seatNumber}" placeholder="4-digit PIN" maxlength="4" class="w-2/3 border border-gray-300 rounded-lg px-3 py-2 text-center font-bold tracking-widest focus:border-primary">
                 <button onclick="startRide(${seatNumber})" class="w-1/3 bg-secondary hover:bg-teal-500 text-white rounded-lg font-bold transition text-sm">Start</button>
@@ -1072,12 +1156,42 @@ socket.on('request-accepted', (data) => {
     // Hide seat selection and go back to dashboard
     showAppView('studentDashboard');
     
-    // Show the Active Ride Modal with the OTP
-    document.getElementById('student-ride-otp').innerText = data.rideOtp;
+    // Show the Active Ride Modal with Payment and OTP
+    const container = document.getElementById('student-ride-otps-container');
+    const otpBlock = document.createElement('div');
+    otpBlock.id = `active-ride-${data.seatNumber}`;
+    otpBlock.className = 'bg-white/20 backdrop-blur-md rounded-xl p-3 text-center border border-white/30 flex flex-col items-center w-full';
+    
+    // Configurable UPI ID (Fallback to a demo UPI if not set)
+    const UPI_ID = window.appConfig?.upiId || '9607783459@axl';
+    const upiLink = `upi://pay?pa=${UPI_ID}&pn=Lily%20Golfcart&am=10&cu=INR`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`;
+
+    otpBlock.innerHTML = `
+        <div class="w-full flex flex-col items-center">
+            <p class="text-[11px] text-emerald-50 mb-2 font-bold uppercase tracking-widest text-center">Step 1: Pay Driver ₹10</p>
+            <div class="bg-white p-2 rounded-xl mb-3 shadow-sm inline-block">
+                <img src="${qrUrl}" alt="UPI QR Code" class="w-32 h-32 mx-auto rounded-lg">
+            </div>
+            <a href="${upiLink}" onclick="if(!/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)){ alert('Please scan the QR code above with your phone! This button only opens UPI apps on mobile devices.'); return false; }" class="bg-white text-emerald-600 font-bold py-2 px-4 rounded-full text-xs mb-4 shadow-md flex items-center justify-center w-full max-w-[200px] hover:bg-emerald-50 transition">
+                <i class="fas fa-bolt mr-2 text-yellow-500"></i> Pay ₹10 via UPI App
+            </a>
+            
+            <div class="w-full border-t border-white/20 pt-3 mt-1">
+                <p class="text-[11px] text-emerald-50 font-bold uppercase tracking-widest text-center mb-2">Step 2: Show OTP to Start Ride</p>
+                <div class="flex justify-between items-center bg-black/10 rounded-lg p-2 px-4 border border-black/5">
+                    <span class="text-xs text-emerald-50 font-medium uppercase tracking-wider">Seat #${data.seatNumber}</span>
+                    <span class="text-3xl font-bold tracking-widest text-white font-mono">${data.rideOtp}</span>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(otpBlock);
+
     document.getElementById('student-active-ride-section').classList.remove('hidden');
     
     // Reset booking form state
-    appState.selectedSeat = null;
+    appState.selectedSeats = [];
     btn.innerText = "Request Booking";
     btn.classList.remove('bg-emerald-500', 'shadow-emerald-500/30');
     btn.classList.add('bg-primary', 'shadow-blue-500/30');
@@ -1089,13 +1203,20 @@ socket.on('request-rejected', (data) => {
     const btn = document.getElementById('btn-confirm-booking');
     btn.innerText = "Request Booking";
     btn.disabled = false;
-    appState.selectedSeat = null;
+    appState.selectedSeats = [];
     if (appState.selectedCartId) renderSeatGrid(appState.selectedCartId);
 });
 
 socket.on('ride-completed', (data) => {
-    // Hide the active ride OTP modal
-    document.getElementById('student-active-ride-section').classList.add('hidden');
+    // Remove the specific seat's OTP block
+    const otpBlock = document.getElementById(`active-ride-${data.seatNumber}`);
+    if (otpBlock) otpBlock.remove();
+    
+    // If no more OTPs are active, hide the container
+    const container = document.getElementById('student-ride-otps-container');
+    if (container && container.children.length === 0) {
+        document.getElementById('student-active-ride-section').classList.add('hidden');
+    }
     
     // Show the Ride Ended thank you section
     document.getElementById('student-ride-ended-section').classList.remove('hidden');
