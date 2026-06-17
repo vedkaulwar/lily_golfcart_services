@@ -576,9 +576,10 @@ function setupRecaptcha() {
     });
 }
 
-function sendOTP(phoneOrEmail) {
+function sendOTP(phoneOrEmail, formId) {
     const isEmail = phoneOrEmail.includes('@');
-    const buttons = document.querySelectorAll('button[type="submit"]');
+    // Only target the button inside the specific form being used
+    const buttons = document.querySelectorAll(`#${formId} button[type="submit"]`);
     buttons.forEach(btn => btn.innerText = "Sending...");
 
     if (isEmail) {
@@ -632,20 +633,33 @@ function sendOTP(phoneOrEmail) {
 
 function handleSignupSendOTP(e) {
     e.preventDefault();
-    const name = document.getElementById('signup-name').value;
-    const phone = document.getElementById('signup-phone').value;
+    const phoneInput = document.getElementById('signup-phone');
+    const phone = phoneInput.value.trim();
+    if (!phone) {
+        alert("Please enter a mobile number or email");
+        return;
+    }
+    const nameInput = document.getElementById('signup-name').value.trim();
+    if (nameInput) {
+        appState.pendingAuthName = nameInput;
+    }
     const role = window.currentAuthRole;
     const cartId = document.getElementById('signup-cart-id') ? document.getElementById('signup-cart-id').value : null;
 
-    const userObj = { name, phone, role, cartId: role === 'driver' ? cartId : null };
+    const userObj = { name: appState.pendingAuthName || 'User', phone, role, cartId: role === 'driver' ? cartId : null };
     localStorage.setItem(`user_${phone}`, JSON.stringify(userObj));
     
-    sendOTP(phone);
+    sendOTP(phone, 'signup-form');
 }
 
 function handleLoginSendOTP(e) {
     e.preventDefault();
-    const phone = document.getElementById('login-phone').value;
+    const phoneInput = document.getElementById('login-phone');
+    const phone = phoneInput.value.trim();
+    if (!phone) {
+        alert("Please enter a mobile number or email");
+        return;
+    }
     
     const userStr = localStorage.getItem(`user_${phone}`);
     if (!userStr) {
@@ -660,7 +674,7 @@ function handleLoginSendOTP(e) {
         return;
     }
 
-    sendOTP(phone);
+    sendOTP(phone, 'login-form');
 }
 
 function setupOTPInputs() {
