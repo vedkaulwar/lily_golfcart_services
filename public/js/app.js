@@ -900,9 +900,11 @@ function recoverActiveRides() {
         
         const activeSection = document.getElementById('student-active-ride-section');
         const availableCarts = document.getElementById('available-carts-section');
+        const bookRideBar = document.getElementById('book-ride-bar');
         
         if (activeSection) activeSection.classList.remove('hidden');
         if (availableCarts) availableCarts.classList.add('hidden');
+        if (bookRideBar) bookRideBar.classList.add('hidden');
         
         // Hide loading overlay if they refreshed while in a pending/active state
         const overlay = document.getElementById('student-loading-overlay');
@@ -1256,6 +1258,10 @@ socket.on('request-accepted', (data) => {
     // Hide the available carts list so it doesn't clutter the UI
     const availableCarts = document.getElementById('available-carts-section');
     if(availableCarts) availableCarts.classList.add('hidden');
+    
+    // Hide the book ride bar
+    const bookRideBar = document.getElementById('book-ride-bar');
+    if (bookRideBar) bookRideBar.classList.add('hidden');
 
     // Show the Active Ride Modal
     document.getElementById('student-active-ride-section').classList.remove('hidden');
@@ -1310,6 +1316,16 @@ socket.on('request-rejected', (data) => {
     btn.disabled = false;
     appState.selectedSeats = [];
     if (appState.selectedCartId) renderSeatGrid(appState.selectedCartId);
+    
+    // Hide the loading overlay that was stuck
+    const overlay = document.getElementById('student-loading-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    
+    // Restore the book ride bar
+    const bookRideBar = document.getElementById('book-ride-bar');
+    if (bookRideBar) bookRideBar.classList.remove('hidden');
+    
+    showAppView('studentDashboard');
 });
 
 socket.on('ride-completed', (data) => {
@@ -1319,6 +1335,10 @@ socket.on('ride-completed', (data) => {
     
     // Hide the active ride UI
     document.getElementById('student-active-ride-section').classList.add('hidden');
+    
+    // Restore the book ride bar
+    const bookRideBar = document.getElementById('book-ride-bar');
+    if (bookRideBar) bookRideBar.classList.remove('hidden');
     
     // Show the Ride Ended thank you section
     document.getElementById('student-ride-ended-section').classList.remove('hidden');
