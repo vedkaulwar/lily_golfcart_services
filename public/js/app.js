@@ -1170,7 +1170,14 @@ socket.on('request-accepted', (data) => {
     // Hide seat selection and go back to dashboard
     showAppView('studentDashboard');
     
-    // Show the Active Ride Modal with Payment and OTP
+    // Hide the available carts list so it doesn't clutter the UI
+    const availableCarts = document.getElementById('available-carts-section');
+    if(availableCarts) availableCarts.classList.add('hidden');
+
+    // Show the Active Ride Modal
+    document.getElementById('student-active-ride-section').classList.remove('hidden');
+    
+    // Build OTP block
     const container = document.getElementById('student-ride-otps-container');
     const otpBlock = document.createElement('div');
     otpBlock.id = `active-ride-${data.seatNumber}`;
@@ -1222,15 +1229,12 @@ socket.on('request-rejected', (data) => {
 });
 
 socket.on('ride-completed', (data) => {
-    // Remove the specific seat's OTP block
-    const otpBlock = document.getElementById(`active-ride-${data.seatNumber}`);
-    if (otpBlock) otpBlock.remove();
-    
-    // If no more OTPs are active, hide the container
+    // Clear the entire active ride section (assuming single student ride)
     const container = document.getElementById('student-ride-otps-container');
-    if (container && container.children.length === 0) {
-        document.getElementById('student-active-ride-section').classList.add('hidden');
-    }
+    if (container) container.innerHTML = '';
+    
+    // Hide the active ride UI
+    document.getElementById('student-active-ride-section').classList.add('hidden');
     
     // Show the Ride Ended thank you section
     document.getElementById('student-ride-ended-section').classList.remove('hidden');
