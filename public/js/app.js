@@ -868,8 +868,8 @@ function recoverActiveRides() {
                 otpBlock.className = 'bg-white/20 backdrop-blur-md rounded-xl p-3 text-center border border-white/30 flex flex-col items-center w-full mt-2';
                 
                 const UPI_ID = window.appConfig?.upiId || '9607783459@axl';
-                const upiLink = `upi://pay?pa=${UPI_ID}&pn=VED%20VISHNU%20KAULWAR`;
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink + '&am=10&cu=INR')}`;
+                const upiLink = `upi://pay?pa=${UPI_ID}&pn=VED%20VISHNU%20KAULWAR&am=10&cu=INR`;
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`;
 
                 otpBlock.innerHTML = `
                     <div class="w-full flex flex-col items-center">
@@ -1274,9 +1274,8 @@ socket.on('request-accepted', (data) => {
     
     // Configurable UPI ID (Fallback to a demo UPI if not set)
     const UPI_ID = window.appConfig?.upiId || '9607783459@axl';
-    // Remove am=10 from the deep link to prevent PhonePe from blocking P2P intents
-    const upiLink = `upi://pay?pa=${UPI_ID}&pn=VED%20VISHNU%20KAULWAR`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink + '&am=10&cu=INR')}`;
+    const upiLink = `upi://pay?pa=${UPI_ID}&pn=VED%20VISHNU%20KAULWAR&am=10&cu=INR`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`;
 
     otpBlock.innerHTML = `
         <div class="w-full flex flex-col items-center">

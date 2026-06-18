@@ -156,7 +156,7 @@ router.get('/rides/history/:phone', async (req, res) => {
 
 // --- Admin Reset Route (For debugging stuck state) ---
 const { db } = require('../config/firebase');
-const CARTS_COLLECTION = 'carts';
+const CARTS_COLLECTION = 'activeCarts';
 
 router.get('/admin/reset-carts', async (req, res) => {
     try {
