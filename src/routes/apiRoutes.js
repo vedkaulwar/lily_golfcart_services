@@ -153,3 +153,37 @@ router.get('/rides/history/:phone', async (req, res) => {
 });
 
 module.exports = router;
+
+// --- Admin Reset Route (For debugging stuck state) ---
+const { db } = require('../config/firebase');
+const CARTS_COLLECTION = 'carts';
+
+router.get('/admin/reset-carts', async (req, res) => {
+    try {
+        const snapshot = await db.collection(CARTS_COLLECTION).get();
+        const batch = db.batch();
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const seats = { ...data.seats };
+            for (const seatNum in seats) {
+                seats[seatNum].status = 'available';
+                seats[seatNum].studentPhone = null;
+                seats[seatNum].studentName = null;
+                seats[seatNum].route = null;
+                seats[seatNum].requestId = null;
+                seats[seatNum].rideOtp = null;
+                seats[seatNum].rideId = null;
+            }
+            batch.update(doc.ref, {
+                isOnline: false,
+                driverSocketId: null,
+                seats: seats
+            });
+        });
+        await batch.commit();
+        res.json({ success: true, message: 'All carts have been reset to offline and available.' });
+    } catch (err) {
+        console.error('Reset error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
