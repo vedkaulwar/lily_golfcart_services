@@ -661,17 +661,24 @@ function handleLoginSendOTP(e) {
         return;
     }
     
-    const userStr = localStorage.getItem(`user_${phone}`);
+    let userStr = localStorage.getItem(`user_${phone}`);
     if (!userStr) {
-        alert('Account not found. Please sign up first.');
-        return;
-    }
-
-    // Verify role matches
-    const userObj = JSON.parse(userStr);
-    if (userObj.role !== window.currentAuthRole) {
-        alert(`This account is registered as a ${userObj.role}. Please use the correct login portal.`);
-        return;
+        // If local storage was cleared or they are on a new device, recreate it
+        const role = window.currentAuthRole;
+        let cartId = null;
+        if (role === 'driver') {
+            cartId = prompt("Since you are logging in from a new device, please re-enter your Golf Cart Number:");
+            if (!cartId) return; // User cancelled
+        }
+        const userObj = { name: 'User', phone, role, cartId };
+        localStorage.setItem(`user_${phone}`, JSON.stringify(userObj));
+    } else {
+        // Verify role matches
+        const userObj = JSON.parse(userStr);
+        if (userObj.role !== window.currentAuthRole) {
+            alert(`This account is registered as a ${userObj.role}. Please use the correct login portal.`);
+            return;
+        }
     }
 
     sendOTP(phone, 'login-form');
