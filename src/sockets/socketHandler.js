@@ -206,11 +206,18 @@ module.exports = (io) => {
                     // Reset any stuck pending seats
                     for (const seatNum in seats) {
                         if (seats[seatNum].status === 'pending') {
+                            const requestId = seats[seatNum].requestId;
                             seats[seatNum].status = 'available';
                             seats[seatNum].studentPhone = null;
                             seats[seatNum].studentName = null;
                             seats[seatNum].route = null;
+                            seats[seatNum].requestId = null;
                             seatsChanged = true;
+                            
+                            // Notify the student that their booking failed because driver disconnected
+                            if (requestId) {
+                                io.to(requestId).emit('request-rejected', { message: 'Driver went offline. Please book another cart.' });
+                            }
                         }
                     }
 

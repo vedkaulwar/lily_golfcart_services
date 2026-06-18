@@ -837,6 +837,77 @@ function transitionToMainApp() {
     
     // Update markers now that we know the user role
     updateMapMarkers();
+    
+    // Recover active rides if they refreshed the page
+    if (appState.user.role === 'student' || appState.user.role === 'user') {
+        recoverActiveRides();
+    }
+}
+
+// --- State Recovery Logic ---
+function recoverActiveRides() {
+    if (!appState.user || !appState.cartData) return;
+    
+    let hasActiveRide = false;
+    const container = document.getElementById('student-ride-otps-container');
+    if (!container) return;
+    
+    // Only clear if we are about to add things (to prevent flickering)
+    let newBlocks = [];
+    
+    for (const cartId in appState.cartData) {
+        const cart = appState.cartData[cartId];
+        for (const seatNum in cart.seats) {
+            const seat = cart.seats[seatNum];
+            if (seat.status === 'occupied' && seat.studentPhone === appState.user.phone) {
+                hasActiveRide = true;
+                
+                // Build OTP block manually
+                const otpBlock = document.createElement('div');
+                otpBlock.id = `active-ride-${seatNum}`;
+                otpBlock.className = 'bg-white/20 backdrop-blur-md rounded-xl p-3 text-center border border-white/30 flex flex-col items-center w-full mt-2';
+                
+                const UPI_ID = window.appConfig?.upiId || '9607783459@axl';
+                const upiLink = `upi://pay?pa=${UPI_ID}&pn=VED%20VISHNU%20KAULWAR`;
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink + '&am=10&cu=INR')}`;
+
+                otpBlock.innerHTML = `
+                    <div class="w-full flex flex-col items-center">
+                        <p class="text-[11px] text-emerald-50 mb-2 font-bold uppercase tracking-widest text-center">Step 1: Pay Driver ₹10</p>
+                        <div class="bg-white p-2 rounded-xl mb-3 shadow-sm inline-block">
+                            <img src="${qrUrl}" alt="UPI QR Code" class="w-32 h-32 mx-auto rounded-lg">
+                        </div>
+                        <a href="${upiLink}" onclick="if(!/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)){ alert('Please scan the QR code above with your phone! This button only opens UPI apps on mobile devices.'); return false; }" class="bg-white text-emerald-600 font-bold py-2 px-4 rounded-full text-xs mb-4 shadow-md flex items-center justify-center w-full max-w-[200px] hover:bg-emerald-50 transition">
+                            <i class="fas fa-bolt mr-2 text-yellow-500"></i> Pay via UPI App
+                        </a>
+                        
+                        <div class="w-full border-t border-white/20 pt-3 mt-1">
+                            <p class="text-[11px] text-emerald-50 font-bold uppercase tracking-widest text-center mb-2">Step 2: Show OTP to Start Ride</p>
+                            <div class="bg-white text-emerald-600 text-3xl font-black py-3 px-6 rounded-xl tracking-widest shadow-inner inline-block">
+                                ${seat.rideOtp}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                newBlocks.push(otpBlock);
+            }
+        }
+    }
+    
+    if (hasActiveRide) {
+        container.innerHTML = '';
+        newBlocks.forEach(b => container.appendChild(b));
+        
+        const activeSection = document.getElementById('student-active-ride-section');
+        const availableCarts = document.getElementById('available-carts-section');
+        
+        if (activeSection) activeSection.classList.remove('hidden');
+        if (availableCarts) availableCarts.classList.add('hidden');
+        
+        // Hide loading overlay if they refreshed while in a pending/active state
+        const overlay = document.getElementById('student-loading-overlay');
+        if (overlay) overlay.classList.add('hidden');
+    }
 }
 
 // --- Cart List Logic ---
@@ -1133,6 +1204,11 @@ socket.on('initial-state', (data) => {
     renderCartsList();
     if (appState.selectedCartId) renderSeatGrid(appState.selectedCartId);
     updateMapMarkers();
+    
+    // Recover state if logged in
+    if (appState.user && (appState.user.role === 'student' || appState.user.role === 'user')) {
+        recoverActiveRides();
+    }
 });
 
 socket.on('cart-state-updated', (data) => {
