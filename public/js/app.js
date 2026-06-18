@@ -1192,7 +1192,8 @@ socket.on('request-accepted', (data) => {
     
     // Configurable UPI ID (Fallback to a demo UPI if not set)
     const UPI_ID = window.appConfig?.upiId || '9607783459@axl';
-    const upiLink = `upi://pay?pa=${UPI_ID}&pn=Lily%20Golfcart&am=10&cu=INR`;
+    // Use the exact bank name to prevent Name Mismatch Security Blocks in GPay/PhonePe
+    const upiLink = `upi://pay?pa=${UPI_ID}&pn=VED%20VISHNU%20KAULWAR&am=10&cu=INR`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`;
 
     otpBlock.innerHTML = `
