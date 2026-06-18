@@ -152,7 +152,7 @@ router.get('/rides/history/:phone', async (req, res) => {
     }
 });
 
-module.exports = router;
+// Remove early export
 
 // --- Admin Reset Route (For debugging stuck state) ---
 const { db } = require('../config/firebase');
@@ -187,3 +187,5 @@ router.get('/admin/reset-carts', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+module.exports = router;
