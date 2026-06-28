@@ -686,13 +686,39 @@ function handleLoginSendOTP(e) {
 
 function setupOTPInputs() {
     const inputs = document.querySelectorAll('#otp-form input[type="text"]');
+    
+    // Support pasting the entire OTP into the first box
+    inputs[0].addEventListener('paste', (e) => {
+        const pastedData = e.clipboardData.getData('text').slice(0, inputs.length);
+        if (pastedData.length === inputs.length && /^\d+$/.test(pastedData)) {
+            inputs.forEach((inp, i) => inp.value = pastedData[i]);
+            inputs[inputs.length - 1].focus();
+            e.preventDefault();
+        }
+    });
+
     inputs.forEach((input, index) => {
-        input.addEventListener('keyup', (e) => {
-            if (e.key >= 0 && e.key <= 9) {
-                if (index < inputs.length - 1) inputs[index + 1].focus();
-            } else if (e.key === 'Backspace') {
-                if (index > 0) inputs[index - 1].focus();
+        // Auto-advance on input (best for mobile keyboards)
+        input.addEventListener('input', (e) => {
+            // Keep only the last typed digit (in case of weird mobile autocomplete)
+            if (input.value.length > 1) {
+                input.value = input.value.slice(-1);
             }
+            if (input.value.length === 1 && index < inputs.length - 1) {
+                inputs[index + 1].focus();
+            }
+        });
+
+        // Handle backspace properly
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && input.value.length === 0 && index > 0) {
+                inputs[index - 1].focus();
+            }
+        });
+        
+        // Select all text on focus for easy replacing
+        input.addEventListener('focus', () => {
+            input.select();
         });
     });
 }
