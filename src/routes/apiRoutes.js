@@ -8,8 +8,14 @@ const { auth } = require('../config/firebase');
 // Simple in-memory store for OTPs
 const emailOtps = new Map();
 
-// (Nodemailer removed because Render blocks SMTP ports)
-// We now use Resend HTTP API which completely bypasses the block!
+// Configure Nodemailer transporter
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
 
 // Send Email OTP
 router.post('/auth/send-email-otp', async (req, res) => {
@@ -24,34 +30,17 @@ router.post('/auth/send-email-otp', async (req, res) => {
     });
 
     try {
-        if (!process.env.RESEND_API_KEY) {
-            throw new Error('RESEND_API_KEY is not configured in environment variables');
-        }
-
-        const response = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                from: 'Lily Golfcart Services <onboarding@resend.dev>',
-                to: [email],
-                subject: 'Your Lily Golfcart Verification Code',
-                html: `<h3>Welcome to Lily Golfcart Services</h3><p>Your login verification code is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`
-            })
+        await transporter.sendMail({
+            from: `"Lily Golfcart Services" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: 'Your Lily Golfcart Verification Code',
+            text: `Your login verification code is: ${otp}. It will expire in 10 minutes.`,
+            html: `<h3>Welcome to Lily Golfcart Services</h3><p>Your login verification code is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`
         });
-
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.message || 'Failed to send email via Resend');
-        }
-
         res.json({ success: true, message: 'OTP sent to email' });
-    } catch (err) {
-        console.error('Email send error:', err);
-        res.status(500).json({ error: 'Failed to send email. Please check server configuration.' });
+    } catch (error) {
+        console.error('Error sending email:', error);
+        res.status(500).json({ error: 'Failed to send email. Check SMTP configuration.' });
     }
 });
 
